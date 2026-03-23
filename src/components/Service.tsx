@@ -23,8 +23,7 @@ const Service: React.FC<ServiceProps> = ({ devices, t }) => {
     if (searchDevice.length < 2) return [];
     return devices.filter(d => 
       d.name.toLowerCase().includes(searchDevice.toLowerCase()) ||
-      d.serial_number.toLowerCase().includes(searchDevice.toLowerCase()) ||
-      d.asset_number.toLowerCase().includes(searchDevice.toLowerCase())
+      d.serial_number.toLowerCase().includes(searchDevice.toLowerCase())
     ).slice(0, 5);
   }, [devices, searchDevice]);
 
@@ -114,10 +113,10 @@ const Service: React.FC<ServiceProps> = ({ devices, t }) => {
             <div className="space-y-2">
               {filteredDevices.map(device => (
                 <button
-                  key={device.id}
+                  key={device.serial_number}
                   onClick={() => setSelectedDevice(device)}
                   className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all text-left cursor-pointer ${
-                    selectedDevice?.id === device.id 
+                    selectedDevice?.serial_number === device.serial_number 
                       ? "bg-spk-yellow/10 border-spk-yellow shadow-sm" 
                       : "bg-spk-gray border-transparent hover:bg-gray-200"
                   }`}
@@ -126,7 +125,7 @@ const Service: React.FC<ServiceProps> = ({ devices, t }) => {
                     <p className="font-bold text-gray-800">{device.name}</p>
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">S/N: {device.serial_number}</p>
                   </div>
-                  {selectedDevice?.id === device.id && <CheckCircle className="w-5 h-5 text-spk-blue" />}
+                  {selectedDevice?.serial_number === device.serial_number && <CheckCircle className="w-5 h-5 text-spk-blue" />}
                 </button>
               ))}
             </div>
@@ -134,7 +133,7 @@ const Service: React.FC<ServiceProps> = ({ devices, t }) => {
               <div className="mt-6 p-4 rounded-xl bg-spk-blue text-white shadow-lg">
                 <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">อุปกรณ์ที่เลือก</p>
                 <p className="font-bold text-lg">{selectedDevice.name}</p>
-                <p className="text-xs opacity-80">เลขครุภัณฑ์: {selectedDevice.asset_number}</p>
+                <p className="text-xs opacity-80">S/N: {selectedDevice.serial_number}</p>
               </div>
             )}
           </div>

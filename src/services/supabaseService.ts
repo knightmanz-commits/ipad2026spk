@@ -94,12 +94,12 @@ export const supabaseService = {
     }
     if (table === 'devices') {
       return {
-        id: data.id,
-        category_id: data.category_id,
         serial_number: data.serial_number,
-        defaultAccessories: data.default_accessories,
+        category_id: data.category_id,
+        default_accessories: data.default_accessories,
         is_featured: data.is_featured,
-        status: data.status
+        status: data.status,
+        created_at: data.created_at
       };
     }
     if (table === 'teachers') {
@@ -158,10 +158,9 @@ export const supabaseService = {
     }
     if (table === 'devices') {
       return {
-        id: data.id,
-        category_id: data.category_id || data.category,
         serial_number: data.serial_number || data.serialNumber,
-        default_accessories: data.defaultAccessories || data.default_accessories,
+        category_id: data.category_id || data.category,
+        default_accessories: data.default_accessories || data.defaultAccessories,
         is_featured: data.is_featured === 'true' || data.is_featured === true,
         status: data.status
       };
@@ -277,7 +276,8 @@ export const supabaseService = {
     
     const idField = targetTable === 'app_users' ? 'username' : 
                     (targetTable === 'students' ? 'student_id' : 
-                    (targetTable === 'categories' ? 'category' : 'id'));
+                    (targetTable === 'categories' ? 'category' : 
+                    (targetTable === 'devices' ? 'serial_number' : 'id')));
 
     try {
       const { data: result, error } = await supabase
@@ -310,7 +310,8 @@ export const supabaseService = {
     const targetTable = tableMap[tableName] || tableName.toLowerCase();
     const idField = targetTable === 'app_users' ? 'username' : 
                     (targetTable === 'students' ? 'student_id' : 
-                    (targetTable === 'categories' ? 'category' : 'id'));
+                    (targetTable === 'categories' ? 'category' : 
+                    (targetTable === 'devices' ? 'serial_number' : 'id')));
 
     try {
       const { error } = await supabase
@@ -390,10 +391,10 @@ export const supabaseService = {
 
   async borrowDevice(studentId: string, serialNumber: string): Promise<any> {
     try {
-      // 1. Get device ID
+      // 1. Check device status
       const { data: device, error: deviceError } = await supabase
         .from('devices')
-        .select('id, status')
+        .select('status')
         .eq('serial_number', serialNumber)
         .single();
 
@@ -404,7 +405,7 @@ export const supabaseService = {
       const { error: transError } = await supabase
         .from('transactions')
         .insert({
-          device_id: device.id,
+          serial_number: serialNumber,
           student_id: studentId,
           borrow_date: new Date().toISOString(),
           status: 'Borrowed'
@@ -416,7 +417,7 @@ export const supabaseService = {
       const { error: updateError } = await supabase
         .from('devices')
         .update({ status: 'Borrowed' })
-        .eq('id', device.id);
+        .eq('serial_number', serialNumber);
 
       if (updateError) throw updateError;
 
@@ -430,33 +431,24 @@ export const supabaseService = {
 
   async returnDevice(studentId: string, serialNumber: string): Promise<any> {
     try {
-      // 1. Get device ID
-      const { data: device, error: deviceError } = await supabase
-        .from('devices')
-        .select('id')
-        .eq('serial_number', serialNumber)
-        .single();
-
-      if (deviceError || !device) throw new Error('Device not found');
-
-      // 2. Update transaction
+      // 1. Update transaction
       const { error: transError } = await supabase
         .from('transactions')
         .update({
           return_date: new Date().toISOString(),
           status: 'Returned'
         })
-        .eq('device_id', device.id)
+        .eq('serial_number', serialNumber)
         .eq('student_id', studentId)
         .eq('status', 'Borrowed');
 
       if (transError) throw transError;
 
-      // 3. Update device status
+      // 2. Update device status
       const { error: updateError } = await supabase
         .from('devices')
         .update({ status: 'Available' })
-        .eq('id', device.id);
+        .eq('serial_number', serialNumber);
 
       if (updateError) throw updateError;
 

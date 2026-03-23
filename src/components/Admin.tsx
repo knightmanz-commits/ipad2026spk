@@ -136,7 +136,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       const entityName = activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace(/s$/, '');
       const action = `${actionPrefix}${entityName}`;
       
-      const result = await supabaseService.handleAction(action, null, isEdit ? { ...data, id: editingItem.id || editingItem.category || editingItem.users || editingItem.studentId } : data);
+      const result = await supabaseService.handleAction(action, null, isEdit ? { ...data, id: editingItem.serial_number || editingItem.id || editingItem.category || editingItem.users || editingItem.studentId } : data);
       
       if (result.success) {
         // Clear cache
@@ -308,13 +308,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         </div>
                         <div>
                           <p className="font-bold text-gray-800">{formatValue(item.name || item.users || item.fullName || item.student_id)}</p>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">ID: {formatValue(item.id || item.category || item.serial_number || item.studentId)}</p>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">S/N: {formatValue(item.serial_number || item.id || item.category || item.studentId)}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-600">
-                        {activeTab === 'devices' && <p>S/N: <span className="font-mono">{formatValue(item.serial_number)}</span></p>}
+                        {activeTab === 'devices' && <p>หมวดหมู่: <span className="font-mono">{formatValue(item.category_id)}</span></p>}
                         {activeTab === 'students' && <p>ชั้น ม.{formatValue(item.grade)}/{formatValue(item.classroom || item.room)}</p>}
                         {activeTab === 'teachers' && <p>ม.{formatValue(item.grade)}/{formatValue(item.classroom)} • {formatValue(item.phone)}</p>}
                         {activeTab === 'users' && <p>{formatValue(item.role)}</p>}
@@ -344,7 +344,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => handleDelete(item.id || item.category || item.studentId || item.users)}
+                          onClick={() => handleDelete(item.serial_number || item.id || item.category || item.studentId || item.users)}
                           className="p-2 hover:bg-red-50 rounded-lg transition-all text-red-500 shadow-sm border border-transparent hover:border-red-100 cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -469,8 +469,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 {activeTab === 'devices' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">รหัสอุปกรณ์ (ID)</label>
-                      <input name="id" defaultValue={editingItem?.id} required className="input" placeholder="เช่น L001" />
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Serial Number (Primary Key)</label>
+                      <input name="serial_number" defaultValue={editingItem?.serial_number} required className="input" placeholder="S/N" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">หมวดหมู่</label>
@@ -479,12 +479,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Serial Number</label>
-                      <input name="serial_number" defaultValue={editingItem?.serial_number} required className="input" placeholder="S/N" />
-                    </div>
-                    <div className="space-y-2">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">อุปกรณ์เสริม</label>
-                      <input name="defaultAccessories" defaultValue={editingItem?.defaultAccessories} className="input" placeholder="เช่น สายชาร์จ, เคส" />
+                      <input name="default_accessories" defaultValue={editingItem?.default_accessories} className="input" placeholder="เช่น สายชาร์จ, เคส" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">สถานะ</label>

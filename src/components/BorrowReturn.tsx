@@ -177,7 +177,7 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, students, onRefres
             >
               <div className="text-center">
                 <h3 className="text-xl font-bold text-spk-blue">เลือกอุปกรณ์</h3>
-                <p className="text-gray-400 text-sm">ค้นหาด้วยชื่อหรือเลขครุภัณฑ์</p>
+                <p className="text-gray-400 text-sm">ค้นหาด้วยชื่อหรือ Serial Number</p>
               </div>
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -243,7 +243,6 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, students, onRefres
                   </div>
                   <p className="text-lg font-bold text-gray-800">{selectedDevice.name}</p>
                   <p className="text-sm text-gray-500">S/N: {selectedDevice.serial_number}</p>
-                  <p className="text-sm text-gray-500">เลขครุภัณฑ์: {selectedDevice.asset_number}</p>
                 </div>
               </div>
 

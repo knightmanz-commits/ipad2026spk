@@ -39,16 +39,17 @@ export interface Category {
 }
 
 export interface Device {
-  id: string; // Device ID (e.g., L001)
-  category_id: string; // Matches category in Category
   serial_number: string;
-  defaultAccessories: string;
+  category_id: string;
+  default_accessories: string;
   is_featured: boolean;
   status: DeviceStatus;
+  created_at?: string;
   // Hydrated fields for UI
   name?: string;
   categoryName?: string;
   designatedFor?: string;
+  imageUrl?: string;
 }
 
 export interface Student {

@@ -175,7 +175,7 @@ const Inventory: React.FC<InventoryProps> = ({ categories, t }) => {
         <AnimatePresence mode="popLayout">
           {filteredItems.map((device, index) => (
             <motion.div
-              key={device.id + '-' + index}
+              key={device.serial_number + '-' + index}
               layout
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -205,10 +205,6 @@ const Inventory: React.FC<InventoryProps> = ({ categories, t }) => {
                 <div className="flex flex-col gap-1">
                   <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Serial Number</p>
                   <p className="text-sm font-medium text-gray-700 font-mono">{formatValue(device.serial_number)}</p>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">เลขครุภัณฑ์</p>
-                  <p className="text-sm font-medium text-gray-700 font-mono">{formatValue(device.asset_number)}</p>
                 </div>
               </div>
 
