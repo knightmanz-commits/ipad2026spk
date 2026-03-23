@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, TranslationKey } from '../types';
-import { gasHelper } from '../services/gasService';
+import { supabaseService } from '../services/supabaseService';
 import { LogIn, Mail, Lock, AlertCircle, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -22,7 +22,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBack, t }) => {
     setError(null);
 
     try {
-      const result = await gasHelper('login', null, { users, password });
+      const result = await supabaseService.login(users, password);
       if (result.success) {
         onLogin(result.data as User);
       } else {

@@ -31,20 +31,20 @@ export interface User {
 }
 
 export interface Category {
-  id: string;
+  category: string; // This is the ID (e.g., laptop, tablet)
   name: string;
   description: string;
-  designatedFor: string; // Changed to string to support flexible roles if needed, or keep it as UserRole if strictly Admin/Staff
+  designatedFor: 'student' | 'teacher' | 'all';
   imageUrl: string;
 }
 
 export interface Device {
+  id: string; // Device ID (e.g., L001)
+  category_id: string; // Matches category in Category
   serial_number: string;
-  category_id: string;
   defaultAccessories: string;
-  borrowedBy?: string;
+  is_featured: boolean;
   status: DeviceStatus;
-  notes?: string;
   // Hydrated fields for UI
   name?: string;
   categoryName?: string;
@@ -62,12 +62,12 @@ export interface Student {
 }
 
 export interface Teacher {
-  id: string;
+  id: number;
   fullName: string;
+  phone: string;
   department: string;
-  email: string;
-  profileImageUrl?: string;
-  classroom?: string; // Added for mapping to students
+  grade: number;
+  classroom: number;
 }
 
 export interface ServiceLog {

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Device, TranslationKey } from '../types';
-import { gasHelper } from '../services/gasService';
+import { supabaseService } from '../services/supabaseService';
 import { Wrench, Search, Package, AlertCircle, CheckCircle, Camera, Send, RefreshCw, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -47,7 +47,7 @@ const Service: React.FC<ServiceProps> = ({ devices, t }) => {
     setMessage(null);
 
     try {
-      const result = await gasHelper('reportService', null, {
+      const result = await supabaseService.reportService({
         serial_number: selectedDevice.serial_number,
         issue_type: issueType,
         details,

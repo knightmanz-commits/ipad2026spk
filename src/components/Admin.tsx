@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Device, Category, User, Teacher, Student, ServiceLog, ServiceReport, TranslationKey, UserRole, DeviceStatus } from '../types';
-import { gasHelper } from '../services/gasService';
+import { supabaseService } from '../services/supabaseService';
 import { 
   Settings, Package, Users, GraduationCap, Wrench, History, Plus, Edit2, Trash2, 
   Search, Filter, ChevronLeft, ChevronRight, X, Save, AlertCircle, CheckCircle,
-  MoreVertical, Download, Upload, Shield, RefreshCw, Loader2
+  MoreVertical, Download, Upload, Shield, RefreshCw, Loader2, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Papa from 'papaparse';
+import { formatValue } from '../utils/format';
 
 interface AdminPanelProps {
   categories: Category[];
@@ -23,6 +25,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [importReport, setImportReport] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -59,20 +62,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       
       // Special handling for students (multiple sheets)
       if (activeTab === 'students') {
-        const sheets = ['StudentsM4', 'StudentsM5', 'StudentsM6'];
-        const results = await Promise.all(sheets.map(sheet => 
-          gasHelper('read', sheet, { searchTerm: debouncedSearch })
-        ));
+        const res = await supabaseService.read('Students', { searchTerm: debouncedSearch });
         
-        let allStudents: any[] = [];
-        results.forEach(res => {
-          if (res.success) allStudents = [...allStudents, ...res.items];
-        });
-        
-        setTotal(allStudents.length);
-        setItems(allStudents.slice(offset, offset + itemsPerPage));
+        if (res.success) {
+          setTotal(res.total);
+          setItems(res.items.slice(offset, offset + itemsPerPage));
+        }
       } else {
-        const res = await gasHelper('read', tabInfo.sheet as string, {
+        const res = await supabaseService.read(tabInfo.sheet as string, {
           offset,
           limit: itemsPerPage,
           searchTerm: debouncedSearch
@@ -109,7 +106,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         serviceReports: 'deleteServiceReport'
       };
       
-      const result = await gasHelper(actionMap[activeTab], null, { id });
+      const result = await supabaseService.handleAction(actionMap[activeTab], null, { id });
       if (result.success) {
         // Clear cache for this action if it was cached
         const cacheKey = `spk_cache_read${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}_`;
@@ -139,7 +136,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       const entityName = activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace(/s$/, '');
       const action = `${actionPrefix}${entityName}`;
       
-      const result = await gasHelper(action, null, isEdit ? { ...data, id: editingItem.id } : data);
+      const result = await supabaseService.handleAction(action, null, isEdit ? { ...data, id: editingItem.id || editingItem.category || editingItem.users || editingItem.studentId } : data);
       
       if (result.success) {
         // Clear cache
@@ -160,6 +157,60 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsLoading(true);
+    setImportReport(null);
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        let successCount = 0;
+        let failedCount = 0;
+        const errors: string[] = [];
+
+        const actionPrefix = 'add';
+        const entityName = activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace(/s$/, '');
+        const action = `${actionPrefix}${entityName}`;
+
+        for (const row of results.data as any[]) {
+          try {
+            // Basic data cleaning: remove empty strings if they are optional
+            const cleanRow = Object.fromEntries(
+              Object.entries(row).map(([k, v]) => [k, v === '' ? null : v])
+            );
+
+            const result = await supabaseService.handleAction(action, null, cleanRow);
+            if (result.success) {
+              successCount++;
+            } else {
+              failedCount++;
+              errors.push(`Row ${successCount + failedCount}: ${result.message || 'Unknown error'}`);
+            }
+          } catch (err) {
+            failedCount++;
+            errors.push(`Row ${successCount + failedCount}: ${err instanceof Error ? err.message : 'System error'}`);
+          }
+        }
+
+        setImportReport({ success: successCount, failed: failedCount, errors });
+        setIsLoading(false);
+        fetchData();
+        onRefresh();
+        
+        // Reset input
+        e.target.value = '';
+      },
+      error: (error) => {
+        alert('เกิดข้อผิดพลาดในการอ่านไฟล์: ' + error.message);
+        setIsLoading(false);
+      }
+    });
+  };
+
   const totalPages = Math.ceil(total / itemsPerPage);
 
   return (
@@ -174,8 +225,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           <button className="btn-secondary flex items-center gap-2 text-sm cursor-pointer">
             <Download className="w-4 h-4" /> Export
           </button>
-          <button className="btn-secondary flex items-center gap-2 text-sm cursor-pointer">
+          <button className="btn-secondary flex items-center gap-2 text-sm cursor-pointer relative">
             <Upload className="w-4 h-4" /> Import
+            <input 
+              type="file" 
+              accept=".csv" 
+              onChange={handleImport}
+              className="absolute inset-0 opacity-0 cursor-pointer" 
+            />
           </button>
           <button 
             onClick={() => { setEditingItem(null); setIsModalOpen(true); }}
@@ -250,18 +307,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                           {activeTab === 'devices' ? <Package className="w-5 h-5" /> : (item.name || item.users || item.fullName || 'ID').charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-bold text-gray-800">{item.name || item.users || item.fullName || item.student_id}</p>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">ID: {item.id || item.serial_number || item.studentId}</p>
+                          <p className="font-bold text-gray-800">{formatValue(item.name || item.users || item.fullName || item.student_id)}</p>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">ID: {formatValue(item.id || item.category || item.serial_number || item.studentId)}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-600">
-                        {activeTab === 'devices' && <p>S/N: <span className="font-mono">{item.serial_number}</span></p>}
-                        {activeTab === 'students' && <p>ชั้น ม.{item.grade}/{item.classroom || item.room}</p>}
-                        {activeTab === 'users' && <p>{item.role}</p>}
-                        {activeTab === 'serviceReports' && <p className="line-clamp-1">{item.details}</p>}
-                        {activeTab === 'categories' && <p>{item.description || '-'}</p>}
+                        {activeTab === 'devices' && <p>S/N: <span className="font-mono">{formatValue(item.serial_number)}</span></p>}
+                        {activeTab === 'students' && <p>ชั้น ม.{formatValue(item.grade)}/{formatValue(item.classroom || item.room)}</p>}
+                        {activeTab === 'teachers' && <p>ม.{formatValue(item.grade)}/{formatValue(item.classroom)} • {formatValue(item.phone)}</p>}
+                        {activeTab === 'users' && <p>{formatValue(item.role)}</p>}
+                        {activeTab === 'serviceReports' && <p className="line-clamp-1">{formatValue(item.details)}</p>}
+                        {activeTab === 'categories' && <p>{formatValue(item.description)}</p>}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -286,7 +344,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => handleDelete(item.id || item.serial_number || item.studentId)}
+                          onClick={() => handleDelete(item.id || item.category || item.studentId || item.users)}
                           className="p-2 hover:bg-red-50 rounded-lg transition-all text-red-500 shadow-sm border border-transparent hover:border-red-100 cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -338,6 +396,57 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {/* Modal */}
       <AnimatePresence>
+        {importReport && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-spk-blue/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-6 bg-spk-blue text-white flex justify-between items-center">
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  <FileText className="w-5 h-5" /> ผลการนำเข้าข้อมูล
+                </h3>
+                <button onClick={() => setImportReport(null)} className="p-1 hover:bg-white/10 rounded-lg transition-colors cursor-pointer">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-green-50 rounded-2xl text-center border border-green-100">
+                    <p className="text-3xl font-bold text-green-600">{importReport.success}</p>
+                    <p className="text-xs font-bold text-green-700 uppercase tracking-widest mt-1">สำเร็จ</p>
+                  </div>
+                  <div className="p-4 bg-red-50 rounded-2xl text-center border border-red-100">
+                    <p className="text-3xl font-bold text-red-600">{importReport.failed}</p>
+                    <p className="text-xs font-bold text-red-700 uppercase tracking-widest mt-1">ล้มเหลว</p>
+                  </div>
+                </div>
+
+                {importReport.errors.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">รายละเอียดข้อผิดพลาด (สูงสุด 5 รายการ)</p>
+                    <div className="bg-gray-50 rounded-xl p-4 text-xs text-red-500 font-mono space-y-1 max-h-32 overflow-y-auto">
+                      {importReport.errors.slice(0, 5).map((err, i) => (
+                        <p key={i}>{err}</p>
+                      ))}
+                      {importReport.errors.length > 5 && <p className="text-gray-400 italic">... และอีก {importReport.errors.length - 5} รายการ</p>}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setImportReport(null)}
+                  className="w-full py-4 rounded-2xl font-bold text-white bg-spk-blue shadow-lg hover:bg-blue-900 transition-all cursor-pointer"
+                >
+                  ตกลง
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-spk-blue/40 backdrop-blur-sm">
             <motion.div
@@ -360,13 +469,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 {activeTab === 'devices' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">ชื่ออุปกรณ์</label>
-                      <input name="name" defaultValue={editingItem?.name} required className="input" placeholder="เช่น iPad Gen 9 #01" />
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">รหัสอุปกรณ์ (ID)</label>
+                      <input name="id" defaultValue={editingItem?.id} required className="input" placeholder="เช่น L001" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">หมวดหมู่</label>
                       <select name="category_id" defaultValue={editingItem?.category_id} required className="input">
-                        {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                        {categories.map(cat => <option key={cat.category} value={cat.category}>{cat.name}</option>)}
                       </select>
                     </div>
                     <div className="space-y-2">
@@ -374,8 +483,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       <input name="serial_number" defaultValue={editingItem?.serial_number} required className="input" placeholder="S/N" />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">เลขครุภัณฑ์</label>
-                      <input name="asset_number" defaultValue={editingItem?.asset_number} required className="input" placeholder="เลขครุภัณฑ์" />
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">อุปกรณ์เสริม</label>
+                      <input name="defaultAccessories" defaultValue={editingItem?.defaultAccessories} className="input" placeholder="เช่น สายชาร์จ, เคส" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">สถานะ</label>
@@ -383,22 +492,42 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         {Object.values(DeviceStatus).map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">URL รูปภาพ</label>
-                      <input name="image_url" defaultValue={editingItem?.image_url} className="input" placeholder="https://..." />
+                    <div className="flex items-center gap-2 pt-8">
+                      <input type="checkbox" name="is_featured" defaultChecked={editingItem?.is_featured} className="w-5 h-5" />
+                      <label className="text-sm font-bold text-gray-600">สินค้าแนะนำ (Featured)</label>
                     </div>
                   </div>
                 )}
 
                 {activeTab === 'categories' && (
                   <div className="space-y-6">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">ชื่อหมวดหมู่</label>
-                      <input name="name" defaultValue={editingItem?.name} required className="input" placeholder="เช่น iPad, Notebook" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">รหัสหมวดหมู่ (ID)</label>
+                        <input name="category" defaultValue={editingItem?.category} required className="input" placeholder="เช่น laptop, tablet" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">ชื่อหมวดหมู่ภาษาไทย</label>
+                        <input name="name" defaultValue={editingItem?.name} required className="input" placeholder="เช่น แท็บเล็ต, โน้ตบุ๊ก" />
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">รายละเอียด</label>
                       <textarea name="description" defaultValue={editingItem?.description} className="input min-h-[100px]" placeholder="คำอธิบายหมวดหมู่..."></textarea>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">กลุ่มเป้าหมาย</label>
+                        <select name="designatedFor" defaultValue={editingItem?.designatedFor || 'all'} required className="input">
+                          <option value="student">นักเรียน (Student)</option>
+                          <option value="teacher">ครู (Teacher)</option>
+                          <option value="all">ทั้งหมด (All)</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">URL รูปภาพ</label>
+                        <input name="imageUrl" defaultValue={editingItem?.imageUrl} className="input" placeholder="https://..." />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -430,15 +559,25 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">ชื่อ-นามสกุล</label>
-                      <input name="name" defaultValue={editingItem?.name} required className="input" placeholder="ชื่อครูที่ปรึกษา" />
+                      <input name="fullName" defaultValue={editingItem?.fullName} required className="input" placeholder="ชื่อครูที่ปรึกษา" />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">ระดับชั้น</label>
-                      <input name="grade" type="number" defaultValue={editingItem?.grade} required className="input" placeholder="ม. (1-6)" />
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">เบอร์โทรศัพท์</label>
+                      <input name="phone" defaultValue={editingItem?.phone} required className="input" placeholder="08X-XXX-XXXX" />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">ห้อง</label>
-                      <input name="room" type="number" defaultValue={editingItem?.room} required className="input" placeholder="ห้อง" />
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">แผนก/กลุ่มสาระ</label>
+                      <input name="department" defaultValue={editingItem?.department} required className="input" placeholder="เช่น วิทยาศาสตร์" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">ระดับชั้น (ม.)</label>
+                        <input name="grade" type="number" defaultValue={editingItem?.grade} required className="input" placeholder="4" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">ห้อง</label>
+                        <input name="classroom" type="number" defaultValue={editingItem?.classroom} required className="input" placeholder="1" />
+                      </div>
                     </div>
                   </div>
                 )}

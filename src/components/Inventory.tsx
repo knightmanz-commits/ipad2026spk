@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Device, Category, DeviceStatus, TranslationKey } from '../types';
 import { Search, Filter, Package, Info, AlertCircle, CheckCircle, RefreshCw, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { gasHelper } from '../services/gasService';
+import { supabaseService } from '../services/supabaseService';
+import { formatValue } from '../utils/format';
 
 interface InventoryProps {
   categories: Category[];
@@ -46,7 +47,7 @@ const Inventory: React.FC<InventoryProps> = ({ categories, t }) => {
     setIsLoading(true);
     try {
       const currentOffset = isNewSearch ? 0 : offset;
-      const res = await gasHelper('read', 'Devices', {
+      const res = await supabaseService.read('Devices', {
         offset: currentOffset,
         limit: limit,
         searchTerm: debouncedSearch
@@ -54,7 +55,7 @@ const Inventory: React.FC<InventoryProps> = ({ categories, t }) => {
 
       if (res.success) {
         const newItems = (res.items as Device[]).map(d => {
-          const cat = categories.find(c => c.id === d.category_id);
+          const cat = categories.find(c => c.category === d.category_id);
           return {
             ...d,
             name: cat?.name || 'Unknown Device',
@@ -149,7 +150,7 @@ const Inventory: React.FC<InventoryProps> = ({ categories, t }) => {
             >
               <option value="all">ทุกหมวดหมู่</option>
               {categories.map(cat => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                <option key={cat.category} value={cat.category}>{cat.name}</option>
               ))}
             </select>
           </div>
@@ -200,20 +201,20 @@ const Inventory: React.FC<InventoryProps> = ({ categories, t }) => {
               </div>
               
               <div className="space-y-2">
-                <h3 className="font-bold text-lg text-spk-blue truncate" title={device.name}>{device.name}</h3>
+                <h3 className="font-bold text-lg text-spk-blue truncate" title={device.name}>{formatValue(device.name)}</h3>
                 <div className="flex flex-col gap-1">
                   <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Serial Number</p>
-                  <p className="text-sm font-medium text-gray-700 font-mono">{device.serial_number || '-'}</p>
+                  <p className="text-sm font-medium text-gray-700 font-mono">{formatValue(device.serial_number)}</p>
                 </div>
                 <div className="flex flex-col gap-1">
                   <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">เลขครุภัณฑ์</p>
-                  <p className="text-sm font-medium text-gray-700 font-mono">{device.asset_number || '-'}</p>
+                  <p className="text-sm font-medium text-gray-700 font-mono">{formatValue(device.asset_number)}</p>
                 </div>
               </div>
 
               <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                  {categories.find(c => c.id === device.category_id)?.name || 'ไม่ระบุหมวดหมู่'}
+                  {categories.find(c => c.category === device.category_id)?.name || 'ไม่ระบุหมวดหมู่'}
                 </span>
                 <button className="p-2 hover:bg-spk-gray rounded-lg transition-colors text-spk-blue cursor-pointer">
                   <Info className="w-4 h-4" />

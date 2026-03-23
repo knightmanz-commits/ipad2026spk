@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Device, Student, DeviceStatus, TranslationKey } from '../types';
-import { gasHelper } from '../services/gasService';
+import { supabaseService } from '../services/supabaseService';
 import { Search, User, Package, Calendar, CheckCircle, AlertCircle, RefreshCw, ArrowRight, ArrowLeft, History } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -47,11 +47,9 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, students, onRefres
     setMessage(null);
 
     try {
-      const action = activeMode === 'borrow' ? 'borrowDevice' : 'returnDevice';
-      const result = await gasHelper(action, null, {
-        studentId: selectedStudent.studentId,
-        serial_number: selectedDevice.serial_number
-      });
+      const result = activeMode === 'borrow' 
+        ? await supabaseService.borrowDevice(selectedStudent.studentId, selectedDevice.serial_number)
+        : await supabaseService.returnDevice(selectedStudent.studentId, selectedDevice.serial_number);
 
       if (result.success) {
         setMessage({ type: 'success', text: activeMode === 'borrow' ? 'ยืมอุปกรณ์สำเร็จ' : 'คืนอุปกรณ์สำเร็จ' });

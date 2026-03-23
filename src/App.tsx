@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, Device, Category, UserRole, DeviceStatus, TranslationKey, ServiceLog, Student, ServiceReport, Teacher, ActivityLog } from './types';
 import { translations } from './constants';
-import { gasHelper } from './services/gasService';
+import { supabaseService } from './services/supabaseService';
 
 // Components
 import LandingPage from './components/LandingPage';
@@ -46,14 +46,14 @@ const App: React.FC = () => {
     setIsLoading(true);
     try {
       const [devicesRes, categoriesRes] = await Promise.all([
-        gasHelper('read', 'Devices'),
-        gasHelper('read', 'Categories')
+        supabaseService.read('Devices'),
+        supabaseService.read('Categories')
       ]);
 
       if (devicesRes.success && categoriesRes.success) {
         const loadedCategories = categoriesRes.items as Category[];
         const loadedDevices = (devicesRes.items as Device[]).map(d => {
-          const cat = loadedCategories.find(c => c.id === d.category_id);
+          const cat = loadedCategories.find(c => c.category === d.category_id);
           return {
             ...d,
             name: cat?.name || 'Unknown Device',
@@ -85,10 +85,10 @@ const App: React.FC = () => {
     
     try {
       const [usersRes, serviceLogsRes, serviceRes, logsRes] = await Promise.all([
-        gasHelper('read', 'Users'),
-        gasHelper('read', 'serviceLogs'),
-        gasHelper('read', 'Service'),
-        gasHelper('read', 'Logs')
+        supabaseService.read('Users'),
+        supabaseService.read('serviceLogs'),
+        supabaseService.read('Service'),
+        supabaseService.read('Logs')
       ]);
 
       if (usersRes.success) setUsers(usersRes.items as User[]);
@@ -114,10 +114,10 @@ const App: React.FC = () => {
     setIsLoading(true);
     try {
       const [studentsM4Res, studentsM5Res, studentsM6Res, teachersRes] = await Promise.all([
-        gasHelper('read', 'StudentsM4'),
-        gasHelper('read', 'StudentsM5'),
-        gasHelper('read', 'StudentsM6'),
-        gasHelper('read', 'Teachers')
+        supabaseService.read('StudentsM4'),
+        supabaseService.read('StudentsM5'),
+        supabaseService.read('StudentsM6'),
+        supabaseService.read('Teachers')
       ]);
 
       const allStudents = [
@@ -154,7 +154,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const checkDb = async () => {
       try {
-        const res = await gasHelper('read', 'Categories');
+        const res = await supabaseService.read('Categories');
         setDbConnected(res.success);
       } catch {
         setDbConnected(false);
