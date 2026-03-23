@@ -1,0 +1,5 @@
+{
+  "name": "ICT Inventory System",
+  "description": "A system for checking and managing iPad and other ICT equipment inventory for students and teachers.",
+  "requestFramePermissions": []
+}
