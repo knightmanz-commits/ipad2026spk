@@ -101,13 +101,10 @@ export interface ActivityLog {
 }
 
 export interface Transaction {
-  borrowerId: number;
-  fid: string;
-  fname: string;
+  id: string;
+  student_id: string;
   serial_number: string;
   borrow_date: string;
-  borrowTime: string;
-  due_date: string;
   return_date: string;
   recorder: string;
   status: string;

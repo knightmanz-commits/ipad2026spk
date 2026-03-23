@@ -2,6 +2,7 @@ import React from 'react';
 import { Device, TranslationKey } from '../types';
 import { Package, CheckCircle, RefreshCw, AlertCircle, BarChart3, TrendingUp, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { formatDate } from '../utils/format';
 
 interface DashboardProps {
   stats: {
@@ -42,7 +43,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onRefresh, t }) => {
           </button>
           <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
             <Clock className="w-4 h-4 text-gray-400" />
-            <span className="text-sm font-medium text-gray-600">{new Date().toLocaleDateString('th-TH', { dateStyle: 'long' })}</span>
+            <span className="text-sm font-medium text-gray-600">{formatDate(new Date())}</span>
           </div>
         </div>
       </header>

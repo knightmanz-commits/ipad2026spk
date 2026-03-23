@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Device, Student, DeviceStatus, TranslationKey } from '../types';
+import { Device, Student, DeviceStatus, TranslationKey, User as UserType } from '../types';
 import { supabaseService } from '../services/supabaseService';
 import { Search, User, Package, Calendar, CheckCircle, AlertCircle, RefreshCw, ArrowRight, ArrowLeft, History } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -7,11 +7,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface BorrowReturnProps {
   devices: Device[];
   students: Student[];
+  currentUser: UserType | null;
   onRefresh: () => void;
   t: (key: TranslationKey) => string;
 }
 
-const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, students, onRefresh, t }) => {
+const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, students, currentUser, onRefresh, t }) => {
   const [activeMode, setActiveMode] = useState<'borrow' | 'return'>('borrow');
   const [step, setStep] = useState(1);
   const [searchStudent, setSearchStudent] = useState('');
@@ -47,9 +48,10 @@ const BorrowReturn: React.FC<BorrowReturnProps> = ({ devices, students, onRefres
     setMessage(null);
 
     try {
+      const recorder = currentUser?.name || 'System';
       const result = activeMode === 'borrow' 
-        ? await supabaseService.borrowDevice(selectedStudent.studentId, selectedDevice.serial_number)
-        : await supabaseService.returnDevice(selectedStudent.studentId, selectedDevice.serial_number);
+        ? await supabaseService.borrowDevice(selectedStudent.studentId, selectedDevice.serial_number, recorder)
+        : await supabaseService.returnDevice(selectedStudent.studentId, selectedDevice.serial_number, recorder);
 
       if (result.success) {
         setMessage({ type: 'success', text: activeMode === 'borrow' ? 'ยืมอุปกรณ์สำเร็จ' : 'คืนอุปกรณ์สำเร็จ' });

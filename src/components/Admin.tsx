@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Papa from 'papaparse';
-import { formatValue } from '../utils/format';
+import { formatValue, formatDate } from '../utils/format';
 
 interface AdminPanelProps {
   categories: Category[];
@@ -16,7 +16,7 @@ interface AdminPanelProps {
   t: (key: TranslationKey) => string;
 }
 
-type AdminTab = 'devices' | 'categories' | 'users' | 'teachers' | 'students' | 'serviceLogs' | 'serviceReports';
+type AdminTab = 'devices' | 'categories' | 'users' | 'teachers' | 'students' | 'serviceLogs' | 'serviceReports' | 'transactions';
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
   categories, onRefresh, t 
@@ -41,6 +41,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     { id: 'students', label: 'นักเรียน', icon: 'Students' }, // Special case for students
     { id: 'serviceLogs', label: 'ประวัติซ่อม', icon: Wrench, sheet: 'serviceLogs' },
     { id: 'serviceReports', label: 'รายงานปัญหา', icon: AlertCircle, sheet: 'Service' },
+    { id: 'transactions', label: 'รายการยืม-คืน', icon: History, sheet: 'Transactions' },
   ];
 
   // Debounce search
@@ -103,7 +104,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         teachers: 'deleteTeacher',
         students: 'deleteStudent',
         serviceLogs: 'deleteServiceLog',
-        serviceReports: 'deleteServiceReport'
+        serviceReports: 'deleteServiceReport',
+        transactions: 'deleteTransaction'
       };
       
       const result = await supabaseService.handleAction(actionMap[activeTab], null, { id });
@@ -136,7 +138,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       const entityName = activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace(/s$/, '');
       const action = `${actionPrefix}${entityName}`;
       
-      const result = await supabaseService.handleAction(action, null, isEdit ? { ...data, id: editingItem.serial_number || editingItem.id || editingItem.category || editingItem.users || editingItem.studentId } : data);
+      const result = await supabaseService.handleAction(action, null, isEdit ? { ...data, id: editingItem.id || editingItem.serial_number || editingItem.category || editingItem.users || editingItem.studentId } : data);
       
       if (result.success) {
         // Clear cache
@@ -178,9 +180,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
         for (const row of results.data as any[]) {
           try {
-            // Basic data cleaning: remove empty strings if they are optional
+            // Basic data cleaning: trim keys and values, and handle empty strings
             const cleanRow = Object.fromEntries(
-              Object.entries(row).map(([k, v]) => [k, v === '' ? null : v])
+              Object.entries(row).map(([k, v]) => {
+                const trimmedKey = k.trim();
+                const trimmedValue = typeof v === 'string' ? v.trim() : v;
+                return [trimmedKey, trimmedValue === '' ? null : trimmedValue];
+              })
             );
 
             const result = await supabaseService.handleAction(action, null, cleanRow);
@@ -307,8 +313,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                           {activeTab === 'devices' ? <Package className="w-5 h-5" /> : (item.name || item.users || item.fullName || 'ID').charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-bold text-gray-800">{formatValue(item.name || item.users || item.fullName || item.student_id)}</p>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">S/N: {formatValue(item.serial_number || item.id || item.category || item.studentId)}</p>
+                          <p className="font-bold text-gray-800">
+                            {activeTab === 'transactions' ? formatValue(item.id) : formatValue(item.name || item.users || item.fullName || item.student_id || item.id)}
+                          </p>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                            {activeTab === 'transactions' ? `Student: ${item.student_id}` : `S/N: ${formatValue(item.serial_number || item.id || item.category || item.studentId)}`}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -320,6 +330,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         {activeTab === 'users' && <p>{formatValue(item.role)}</p>}
                         {activeTab === 'serviceReports' && <p className="line-clamp-1">{formatValue(item.details)}</p>}
                         {activeTab === 'categories' && <p>{formatValue(item.description)}</p>}
+                        {activeTab === 'transactions' && (
+                          <div className="space-y-1">
+                            <p>S/N: <span className="font-mono font-bold text-spk-blue">{item.serial_number}</span></p>
+                            <p>ผู้บันทึก: <span className="text-spk-blue">{item.recorder}</span></p>
+                            <p className="text-[10px] text-gray-400">
+                              {item.borrow_date && `ยืม: ${formatDate(item.borrow_date, true)}`}
+                              {item.return_date && ` | คืน: ${formatDate(item.return_date, true)}`}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -595,6 +615,38 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">ห้อง</label>
                       <input name="room" type="number" defaultValue={editingItem?.room || editingItem?.classroom} required className="input" placeholder="ห้อง" />
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'transactions' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">รหัสนักเรียน</label>
+                      <input name="student_id" defaultValue={editingItem?.student_id} required className="input" placeholder="รหัสนักเรียน" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Serial Number</label>
+                      <input name="serial_number" defaultValue={editingItem?.serial_number} required className="input" placeholder="S/N" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">วันที่ยืม</label>
+                      <input type="datetime-local" name="borrow_date" defaultValue={editingItem?.borrow_date ? new Date(editingItem.borrow_date).toISOString().slice(0, 16) : ''} required className="input" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">วันที่คืน</label>
+                      <input type="datetime-local" name="return_date" defaultValue={editingItem?.return_date ? new Date(editingItem.return_date).toISOString().slice(0, 16) : ''} className="input" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">ผู้บันทึก</label>
+                      <input name="recorder" defaultValue={editingItem?.recorder} required className="input" placeholder="ชื่อผู้บันทึก" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">สถานะ</label>
+                      <select name="status" defaultValue={editingItem?.status || 'Borrowed'} required className="input">
+                        <option value="Borrowed">Borrowed</option>
+                        <option value="Returned">Returned</option>
+                      </select>
                     </div>
                   </div>
                 )}

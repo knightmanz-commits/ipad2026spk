@@ -102,6 +102,17 @@ export const supabaseService = {
         created_at: data.created_at
       };
     }
+    if (table === 'transactions') {
+      return {
+        id: data.id,
+        student_id: data.student_id,
+        serial_number: data.serial_number,
+        borrow_date: data.borrow_date,
+        return_date: data.return_date,
+        recorder: data.recorder,
+        status: data.status
+      };
+    }
     if (table === 'teachers') {
       return {
         id: data.id,
@@ -145,6 +156,42 @@ export const supabaseService = {
     return data;
   },
 
+  // Helper to parse date input from DD-MM-YYYY to ISO
+  parseDateInput(dateStr: string | null | undefined): string | null {
+    if (!dateStr || dateStr === '') return null;
+    
+    // If already ISO format (YYYY-MM-DD...)
+    if (dateStr.includes('T') || /^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+      return dateStr;
+    }
+
+    // Handle DD-MM-YYYY or DD/MM/YYYY
+    const parts = dateStr.split(/[-/]/);
+    if (parts.length === 3) {
+      const day = parts[0].padStart(2, '0');
+      const month = parts[1].padStart(2, '0');
+      const year = parts[2];
+      
+      // Check if it's YYYY-MM-DD or DD-MM-YYYY
+      if (year.length === 4) {
+        return `${year}-${month}-${day}`;
+      } else if (day.length === 4) {
+        // It was actually YYYY-MM-DD
+        return `${day}-${month}-${year}`;
+      }
+    }
+
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? null : date.toISOString();
+  },
+
+  // Helper to parse integer safely
+  safeParseInt(val: any, defaultVal: number = 0): number {
+    if (val === null || val === undefined || val === '') return defaultVal;
+    const parsed = parseInt(val);
+    return isNaN(parsed) ? defaultVal : parsed;
+  },
+
   // Helper to map App fields to DB fields
   mapToDb(table: string, data: any) {
     if (table === 'categories') {
@@ -171,16 +218,16 @@ export const supabaseService = {
         full_name: data.fullName || data.full_name,
         phone: data.phone,
         department: data.department,
-        grade: parseInt(data.grade),
-        classroom: parseInt(data.classroom || data.room)
+        grade: this.safeParseInt(data.grade),
+        classroom: this.safeParseInt(data.classroom || data.room)
       };
     }
     if (table === 'students') {
       return {
         student_id: data.studentId || data.student_id,
         full_name: data.fullName || data.name || data.full_name,
-        grade: parseInt(data.grade),
-        classroom: parseInt(data.classroom || data.room),
+        grade: this.safeParseInt(data.grade),
+        classroom: this.safeParseInt(data.classroom || data.room),
         email: data.email
       };
     }
@@ -190,6 +237,17 @@ export const supabaseService = {
         password: data.password,
         name: data.name,
         role: data.role
+      };
+    }
+    if (table === 'transactions') {
+      return {
+        id: data.id || `TRX-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        student_id: data.student_id || data.studentId,
+        serial_number: data.serial_number || data.serialNumber,
+        borrow_date: this.parseDateInput(data.borrow_date) || new Date().toISOString(),
+        return_date: this.parseDateInput(data.return_date),
+        recorder: data.recorder,
+        status: data.status || 'Borrowed'
       };
     }
     return data;
@@ -236,10 +294,16 @@ export const supabaseService = {
   async create(tableName: string, data: any): Promise<any> {
     const tableMap: Record<string, string> = {
       'Devices': 'devices',
+      'Device': 'devices',
       'Categories': 'categories',
+      'Category': 'categories',
       'Users': 'app_users',
+      'User': 'app_users',
       'Students': 'students',
-      'Service': 'service_reports'
+      'Student': 'students',
+      'Service': 'service_reports',
+      'Transactions': 'transactions',
+      'Transaction': 'transactions'
     };
     const targetTable = tableMap[tableName] || tableName.toLowerCase();
     const dbData = this.mapToDb(targetTable, data);
@@ -266,10 +330,16 @@ export const supabaseService = {
   async update(tableName: string, id: string, data: any): Promise<any> {
     const tableMap: Record<string, string> = {
       'Devices': 'devices',
+      'Device': 'devices',
       'Categories': 'categories',
+      'Category': 'categories',
       'Users': 'app_users',
+      'User': 'app_users',
       'Students': 'students',
-      'Service': 'service_reports'
+      'Student': 'students',
+      'Service': 'service_reports',
+      'Transactions': 'transactions',
+      'Transaction': 'transactions'
     };
     const targetTable = tableMap[tableName] || tableName.toLowerCase();
     const dbData = this.mapToDb(targetTable, data);
@@ -302,10 +372,16 @@ export const supabaseService = {
   async delete(tableName: string, id: string): Promise<any> {
     const tableMap: Record<string, string> = {
       'Devices': 'devices',
+      'Device': 'devices',
       'Categories': 'categories',
+      'Category': 'categories',
       'Users': 'app_users',
+      'User': 'app_users',
       'Students': 'students',
-      'Service': 'service_reports'
+      'Student': 'students',
+      'Service': 'service_reports',
+      'Transactions': 'transactions',
+      'Transaction': 'transactions'
     };
     const targetTable = tableMap[tableName] || tableName.toLowerCase();
     const idField = targetTable === 'app_users' ? 'username' : 
@@ -389,7 +465,7 @@ export const supabaseService = {
     }
   },
 
-  async borrowDevice(studentId: string, serialNumber: string): Promise<any> {
+  async borrowDevice(studentId: string, serialNumber: string, recorder: string): Promise<any> {
     try {
       // 1. Check device status
       const { data: device, error: deviceError } = await supabase
@@ -408,6 +484,7 @@ export const supabaseService = {
           serial_number: serialNumber,
           student_id: studentId,
           borrow_date: new Date().toISOString(),
+          recorder: recorder,
           status: 'Borrowed'
         });
 
@@ -429,13 +506,14 @@ export const supabaseService = {
     }
   },
 
-  async returnDevice(studentId: string, serialNumber: string): Promise<any> {
+  async returnDevice(studentId: string, serialNumber: string, recorder: string): Promise<any> {
     try {
       // 1. Update transaction
       const { error: transError } = await supabase
         .from('transactions')
         .update({
           return_date: new Date().toISOString(),
+          recorder: recorder,
           status: 'Returned'
         })
         .eq('serial_number', serialNumber)

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ActivityLog, TranslationKey } from '../types';
 import { Search, History, Filter, ChevronLeft, ChevronRight, Clock, User, Tag } from 'lucide-react';
-import { formatThaiDate } from '../constants';
+import { formatDate } from '../utils/format';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface LogsProps {
@@ -79,7 +79,7 @@ const Logs: React.FC<LogsProps> = ({ logs, t }) => {
                     className="hover:bg-spk-gray/30 transition-colors group"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-medium text-gray-600">{formatThaiDate(log.timestamp)}</span>
+                      <span className="text-sm font-medium text-gray-600">{formatDate(log.timestamp, true)}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">

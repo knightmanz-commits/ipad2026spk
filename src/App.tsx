@@ -221,7 +221,7 @@ const App: React.FC = () => {
       case 'inventory':
         return <Inventory devices={devices} categories={categories} t={t} />;
       case 'borrow':
-        return <BorrowReturn devices={extendedDevices} students={students} onRefresh={loadPublicData} t={t} />;
+        return <BorrowReturn devices={extendedDevices} students={students} currentUser={currentUser} onRefresh={loadPublicData} t={t} />;
       case 'service':
         return <Service devices={extendedDevices} t={t} />;
       case 'students':
