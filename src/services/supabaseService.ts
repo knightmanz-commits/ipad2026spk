@@ -152,36 +152,36 @@ export const supabaseService = {
         category: data.category,
         name: data.name,
         description: data.description,
-        designated_for: data.designatedFor,
-        image_url: data.imageUrl
+        designated_for: data.designatedFor || data.designated_for,
+        image_url: data.imageUrl || data.image_url
       };
     }
     if (table === 'devices') {
       return {
         id: data.id,
-        category_id: data.category_id,
-        serial_number: data.serial_number,
-        default_accessories: data.defaultAccessories,
-        is_featured: data.is_featured,
+        category_id: data.category_id || data.category,
+        serial_number: data.serial_number || data.serialNumber,
+        default_accessories: data.defaultAccessories || data.default_accessories,
+        is_featured: data.is_featured === 'true' || data.is_featured === true,
         status: data.status
       };
     }
     if (table === 'teachers') {
       return {
         id: data.id,
-        full_name: data.fullName,
+        full_name: data.fullName || data.full_name,
         phone: data.phone,
         department: data.department,
         grade: parseInt(data.grade),
-        classroom: parseInt(data.classroom)
+        classroom: parseInt(data.classroom || data.room)
       };
     }
     if (table === 'students') {
       return {
-        student_id: data.studentId,
-        full_name: data.fullName,
-        grade: data.grade,
-        classroom: data.classroom,
+        student_id: data.studentId || data.student_id,
+        full_name: data.fullName || data.name || data.full_name,
+        grade: parseInt(data.grade),
+        classroom: parseInt(data.classroom || data.room),
         email: data.email
       };
     }
